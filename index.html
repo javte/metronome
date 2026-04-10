@@ -80,7 +80,46 @@
   .page { display: none; flex: 1; padding: 0 24px 40px; }
   .page.active { display: block; }
 
-  /* BPM display */
+  /* Song header */
+  .song-header {
+    margin-bottom: 14px;
+  }
+
+  .song-header-inner {
+    background: var(--surface);
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .song-header-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent2);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .song-update-btn {
+    background: rgba(245,166,35,0.15);
+    border: 1px solid rgba(245,166,35,0.4);
+    color: var(--accent2);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .song-update-btn:active { opacity: 0.7; }
   .bpm-display {
     background: var(--surface);
     border-radius: var(--radius);
@@ -312,6 +351,27 @@
 
   .preset-del:active { color: var(--accent); }
 
+  .preset-handle {
+    color: var(--text2);
+    font-size: 18px;
+    padding: 4px 8px 4px 0;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    line-height: 1;
+    opacity: 0.5;
+  }
+
+  .preset-card.dragging {
+    opacity: 0.4;
+    border-color: var(--accent);
+  }
+
+  .preset-card.drag-over {
+    border-color: var(--accent2);
+    background: rgba(245,166,35,0.06);
+  }
+
   .empty-state {
     text-align: center;
     padding: 48px 24px;
@@ -389,6 +449,13 @@
 </div>
 
 <div class="page active" id="page-play">
+
+  <div class="song-header" id="song-header" style="display:none;">
+    <div class="song-header-inner">
+      <div class="song-header-name" id="song-header-name"></div>
+      <button class="song-update-btn" onclick="updateCurrentPreset()">Save changes</button>
+    </div>
+  </div>
 
   <div class="bpm-display">
     <div class="bpm-label">Beats per minute</div>
@@ -482,6 +549,7 @@ let nextNoteTime = 0;
 let schedulerTimer = null;
 let tapTimes = [];
 let currentPresetName = '';
+let currentPresetIdx = -1;
 let soundType = 'click'; // click | beep | wood
 let wakeLock = null;
 
@@ -621,9 +689,9 @@ function setBpm(val) {
   slider.style.setProperty('--val', pct + '%');
 }
 
-function adjustBpm(delta) { setBpm(bpm + delta); updateBpmName(); }
+function adjustBpm(delta) { setBpm(bpm + delta); updateBpmName(); clearPresetContext(); }
 
-function onSliderChange(val) { setBpm(parseInt(val)); updateBpmName(); }
+function onSliderChange(val) { setBpm(parseInt(val)); updateBpmName(); clearPresetContext(); }
 
 function updateBpmName() {
   const names = [
@@ -647,6 +715,7 @@ function buildChips() {
       document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active'));
       c.classList.add('active');
       buildBeatDots();
+      clearPresetContext();
     };
     tc.appendChild(c);
   });
@@ -658,6 +727,7 @@ function buildChips() {
     document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active'));
     freeChip.classList.add('active');
     buildBeatDots();
+    clearPresetContext();
   };
   tc.appendChild(freeChip);
 
@@ -670,6 +740,7 @@ function buildChips() {
       soundType = s;
       document.querySelectorAll('#sound-chips .chip').forEach(x => x.classList.remove('active'));
       c.classList.add('active');
+      clearPresetContext();
     };
     sc.appendChild(c);
   });
@@ -722,39 +793,131 @@ function renderPresets() {
   presets.forEach((p, idx) => {
     const card = document.createElement('div');
     card.className = 'preset-card';
-    const timeSigLabel = p.timeSig ? ` · ${p.timeSig}/4` : '';
+    card.dataset.idx = idx;
+    const timeSigLabel = p.freeTime ? ' · Free' : (p.timeSig ? ` · ${p.timeSig}/4` : '');
+    const soundLabel = p.sound ? ` · ${p.sound.charAt(0).toUpperCase() + p.sound.slice(1)}` : '';
     card.innerHTML = `
+      <div class="preset-handle">⠿</div>
       <div class="preset-bpm">${p.bpm}</div>
       <div class="preset-info">
         <div class="preset-title">${escHtml(p.title)}</div>
-        <div class="preset-meta">BPM ${p.bpm}${timeSigLabel}</div>
+        <div class="preset-meta">BPM ${p.bpm}${timeSigLabel}${soundLabel}</div>
       </div>
       <button class="preset-del" onclick="deletePreset(${idx}, event)">×</button>
     `;
     card.onclick = (e) => {
-      if (e.target.classList.contains('preset-del')) return;
+      if (e.target.classList.contains('preset-del') || e.target.classList.contains('preset-handle')) return;
       loadPreset(p);
     };
     list.appendChild(card);
+  });
+
+  setupDrag();
+}
+
+function setupDrag() {
+  const list = document.getElementById('preset-list');
+  let draggingCard = null;
+  let startY = 0;
+  let startIdx = 0;
+
+  list.querySelectorAll('.preset-handle').forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      e.stopPropagation();
+      draggingCard = handle.closest('.preset-card');
+      startIdx = parseInt(draggingCard.dataset.idx);
+      startY = e.touches[0].clientY;
+      draggingCard.classList.add('dragging');
+    }, { passive: true });
+  });
+
+  list.addEventListener('touchmove', e => {
+    if (!draggingCard) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    const cards = [...list.querySelectorAll('.preset-card')];
+    cards.forEach(c => c.classList.remove('drag-over'));
+    const target = cards.find(c => {
+      if (c === draggingCard) return false;
+      const r = c.getBoundingClientRect();
+      return y >= r.top && y <= r.bottom;
+    });
+    if (target) target.classList.add('drag-over');
+  }, { passive: false });
+
+  list.addEventListener('touchend', e => {
+    if (!draggingCard) return;
+    const cards = [...list.querySelectorAll('.preset-card')];
+    const target = cards.find(c => c.classList.contains('drag-over'));
+    if (target) {
+      const toIdx = parseInt(target.dataset.idx);
+      const presets = getPresets();
+      const [moved] = presets.splice(startIdx, 1);
+      presets.splice(toIdx, 0, moved);
+      savePresets(presets);
+      renderPresets();
+    } else {
+      draggingCard.classList.remove('dragging');
+      cards.forEach(c => c.classList.remove('drag-over'));
+    }
+    draggingCard = null;
   });
 }
 
 function loadPreset(p) {
   setBpm(p.bpm);
-  if (p.timeSig) {
-    timeSig = p.timeSig;
-    document.querySelectorAll('#timesig-chips .chip').forEach((c, i) => {
-      c.classList.toggle('active', timeSigs[i] === timeSig);
-    });
-    buildBeatDots();
-  }
+  timeSig = p.timeSig || 4;
+  freeTime = p.freeTime || false;
+  soundType = p.sound || 'click';
+  document.querySelectorAll('#timesig-chips .chip').forEach((c, i) => {
+    const n = timeSigs[i];
+    c.classList.toggle('active', !freeTime && n === timeSig);
+  });
+  const freeChip = document.querySelector('#timesig-chips .chip:last-child');
+  if (freeChip) freeChip.classList.toggle('active', freeTime);
+  document.querySelectorAll('#sound-chips .chip').forEach(c => {
+    c.classList.toggle('active', c.textContent.toLowerCase() === soundType);
+  });
+  buildBeatDots();
   currentPresetName = p.title;
-  document.getElementById('bpm-name').textContent = p.title;
-  updateBpmName();
+  currentPresetIdx = getPresets().findIndex(x => x.title === p.title && x.bpm === p.bpm);
+  updateSongHeader();
   switchTab('play');
 }
 
-function deletePreset(idx, e) {
+function updateSongHeader() {
+  const header = document.getElementById('song-header');
+  const nameEl = document.getElementById('song-header-name');
+  if (currentPresetIdx >= 0 && currentPresetName) {
+    header.style.display = 'block';
+    nameEl.textContent = '🎵 ' + currentPresetName;
+  } else {
+    header.style.display = 'none';
+  }
+}
+
+function updateCurrentPreset() {
+  if (currentPresetIdx < 0) return;
+  const presets = getPresets();
+  if (!presets[currentPresetIdx]) return;
+  presets[currentPresetIdx] = {
+    title: currentPresetName,
+    bpm,
+    timeSig,
+    freeTime,
+    sound: soundType
+  };
+  savePresets(presets);
+  const btn = document.querySelector('.song-update-btn');
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => btn.textContent = 'Save changes', 1500);
+}
+
+function clearPresetContext() {
+  currentPresetName = '';
+  currentPresetIdx = -1;
+  updateSongHeader();
+}
   e.stopPropagation();
   const presets = getPresets();
   presets.splice(idx, 1);
@@ -786,11 +949,13 @@ function savePreset() {
   if (!title) { alert('Please enter a song name.'); return; }
   if (!bpmVal || bpmVal < 30 || bpmVal > 300) { alert('BPM must be between 30 and 300.'); return; }
   const presets = getPresets();
-  presets.unshift({ title, bpm: bpmVal, timeSig });
+  presets.unshift({ title, bpm: bpmVal, timeSig, freeTime, sound: soundType });
   savePresets(presets);
   closeModal();
   setBpm(bpmVal);
-  document.getElementById('bpm-name').textContent = title;
+  currentPresetName = title;
+  currentPresetIdx = 0;
+  updateSongHeader();
 }
 
 function addPreset() {
@@ -799,7 +964,7 @@ function addPreset() {
   if (!title) { alert('Please enter a song name.'); return; }
   if (!bpmVal || bpmVal < 30 || bpmVal > 300) { alert('BPM must be between 30 and 300.'); return; }
   const presets = getPresets();
-  presets.unshift({ title, bpm: bpmVal, timeSig: 4 });
+  presets.unshift({ title, bpm: bpmVal, timeSig: 4, freeTime: false, sound: 'click' });
   savePresets(presets);
   closeModal();
   renderPresets();
