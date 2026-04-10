@@ -1,9 +1,8 @@
 {
-  "name": "Metronome",
-  "short_name": "Metronome",
+  "name": "Jeds Metronome",
+  "short_name": "Jeds Metro",
   "description": "Offline metronome with BPM presets for your songs",
-  "start_url": "/metronome/",
-  "scope": "/metronome/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
