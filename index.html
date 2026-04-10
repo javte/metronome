@@ -1,239 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Jed's Metronome">
-<meta name="theme-color" content="#1a1a2e">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.svg">
-<title>🕰️ Jeds Metronome</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-  input, textarea { touch-action: auto; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Jeds Metronome">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>🕰️ Jeds Metronome</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        input, textarea { touch-action: auto; }
 
-  :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --card: #0f3460;
-    --accent: #e94560;
-    --accent2: #f5a623;
-    --text: #eaeaea;
-    --text2: #a0a0b0;
-    --border: rgba(255,255,255,0.1);
-    --radius: 16px;
-  }
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --card: #0f3460;
+            --accent: #e94560;
+            --accent2: #f5a623;
+            --text: #eaeaea;
+            --text2: #a0a0b0;
+            --border: rgba(255,255,255,0.1);
+            --radius: 16px;
+        }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg); color: var(--text);
-    min-height: 100vh; min-height: -webkit-fill-available;
-    display: flex; flex-direction: column; overflow-x: hidden;
-  }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh;
+            display: flex; flex-direction: column; overflow-x: hidden;
+        }
 
-  header { padding: 56px 24px 16px; display: flex; align-items: center; justify-content: space-between; }
-  header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        header { padding: 40px 24px 16px; display: flex; align-items: center; justify-content: space-between; }
+        header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
 
-  .tab-bar { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin: 0 24px 20px; }
-  .tab { flex: 1; padding: 9px; text-align: center; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; transition: all 0.2s; border: none; background: none; }
-  .tab.active { background: var(--card); color: var(--text); }
+        .tab-bar { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin: 0 24px 20px; }
+        .tab { flex: 1; padding: 12px; text-align: center; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.2s; border: none; background: none; }
+        .tab.active { background: var(--card); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 
-  .page { display: none; flex: 1; padding: 0 24px 40px; }
-  .page.active { display: block; }
+        .page { display: none; flex: 1; padding: 0 24px 40px; }
+        .page.active { display: block; animation: fadeIn 0.3s ease-out; }
 
-  /* Song header */
-  .song-header { margin-bottom: 14px; }
-  .song-header-inner { background: var(--surface); border: 1px solid rgba(245,166,35,0.3); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-  .song-header-name { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .song-collection-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
-  .song-collection-badge.party { background: rgba(233,69,96,0.15); color: var(--accent); border: 1px solid rgba(233,69,96,0.3); }
-  .song-collection-badge.personal { background: rgba(245,166,35,0.15); color: var(--accent2); border: 1px solid rgba(245,166,35,0.3); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* BPM display */
-  .bpm-display { background: var(--surface); border-radius: var(--radius); padding: 32px 24px 24px; text-align: center; margin-bottom: 20px; border: 1px solid var(--border); }
-  .bpm-label { font-size: 13px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
-  .bpm-number { font-size: 80px; font-weight: 800; letter-spacing: -4px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
-  .bpm-name { font-size: 13px; color: var(--accent2); margin-top: 8px; min-height: 18px; font-style: italic; }
+        /* Song header */
+        .song-header { margin-bottom: 14px; }
+        .song-header-inner { background: var(--surface); border: 1px solid rgba(245,166,35,0.3); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+        .song-header-name { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .song-collection-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
+        .song-collection-badge.party { background: rgba(233,69,96,0.15); color: var(--accent); border: 1px solid rgba(233,69,96,0.3); }
+        .song-collection-badge.personal { background: rgba(245,166,35,0.15); color: var(--accent2); border: 1px solid rgba(245,166,35,0.3); }
 
-  /* Beat dots */
-  .beat-row { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
-  .beat-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--border); transition: background 0.08s; }
-  .beat-dot.accent { background: rgba(245,166,35,0.3); }
-  .beat-dot.active { background: var(--accent) !important; transform: scale(1.2); }
-  .beat-dot.accent.active { background: var(--accent2) !important; }
+        /* BPM display */
+        .bpm-display { background: var(--surface); border-radius: var(--radius); padding: 32px 24px 24px; text-align: center; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .bpm-label { font-size: 13px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+        .bpm-number { font-size: 80px; font-weight: 800; letter-spacing: -4px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+        .bpm-name { font-size: 13px; color: var(--accent2); margin-top: 8px; min-height: 18px; font-style: italic; }
 
-  /* Slider */
-  .slider-wrap { margin: 20px 0; }
-  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--val, 30%), var(--surface) var(--val, 30%)); outline: none; cursor: pointer; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 2px 8px rgba(233,69,96,0.4); }
+        /* Beat dots */
+        .beat-row { display: flex; gap: 8px; justify-content: center; margin: 16px 0; min-height: 20px; }
+        .beat-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--border); transition: background 0.08s, transform 0.1s; }
+        .beat-dot.accent { background: rgba(245,166,35,0.3); }
+        .beat-dot.active { background: var(--accent) !important; transform: scale(1.3); }
+        .beat-dot.accent.active { background: var(--accent2) !important; }
 
-  /* Buttons */
-  .btn-row { display: flex; gap: 10px; margin: 20px 0; }
-  .btn { flex: 1; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 600; border: 1px solid var(--border); cursor: pointer; transition: transform 0.1s, opacity 0.2s; background: var(--surface); color: var(--text2); }
-  .btn:active { transform: scale(0.96); }
-  .btn.primary { background: var(--accent); color: white; border-color: transparent; flex: 2; font-size: 17px; box-shadow: 0 4px 20px rgba(233,69,96,0.3); }
-  .btn.primary.playing { background: #4caf50; box-shadow: 0 4px 20px rgba(76,175,80,0.3); }
+        /* Slider */
+        .slider-wrap { margin: 24px 0; }
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px; background: var(--surface); outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 2px 10px rgba(233,69,96,0.5); border: 2px solid white; }
 
-  .section-label { font-size: 12px; color: var(--text2); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
-  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-  .chip { padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; background: var(--surface); border: 1px solid var(--border); color: var(--text2); cursor: pointer; transition: all 0.15s; }
-  .chip.active { background: var(--card); border-color: var(--accent); color: var(--text); }
+        /* Buttons */
+        .btn-row { display: flex; gap: 10px; margin: 20px 0; }
+        .btn { flex: 1; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; border: 1px solid var(--border); cursor: pointer; transition: transform 0.1s, background 0.2s; background: var(--surface); color: var(--text); }
+        .btn:active { transform: scale(0.95); background: var(--card); }
+        .btn.primary { background: var(--accent); color: white; border-color: transparent; flex: 2; font-size: 17px; box-shadow: 0 4px 20px rgba(233,69,96,0.3); }
+        .btn.primary.playing { background: #4caf50; box-shadow: 0 4px 20px rgba(76,175,80,0.3); }
 
-  .tap-btn { width: 100%; padding: 20px; border-radius: 14px; background: var(--surface); border: 1.5px dashed rgba(245,166,35,0.4); color: var(--accent2); font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.1s; margin-top: 8px; }
-  .tap-btn:active { transform: scale(0.97); background: rgba(245,166,35,0.1); }
+        .section-label { font-size: 12px; color: var(--text2); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; margin-top: 20px; }
+        .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .chip { padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; background: var(--surface); border: 1px solid var(--border); color: var(--text2); cursor: pointer; transition: all 0.15s; }
+        .chip.active { background: var(--card); border-color: var(--accent); color: var(--text); }
 
-  /* Presets page */
-  .collection-tabs { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; margin-bottom: 18px; border: 1px solid var(--border); }
-  .col-tab { flex: 1; padding: 8px; text-align: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.2s; border: none; background: none; }
-  .col-tab.party.active { background: rgba(233,69,96,0.1); color: var(--accent); border: 1px solid rgba(233,69,96,0.4); }
-  .col-tab.personal.active { background: rgba(245,166,35,0.1); color: var(--accent2); border: 1px solid rgba(245,166,35,0.4); }
+        .tap-btn { width: 100%; padding: 22px; border-radius: 14px; background: var(--surface); border: 2px dashed rgba(245,166,35,0.4); color: var(--accent2); font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.1s; margin-top: 12px; }
+        .tap-btn:active { transform: scale(0.98); background: rgba(245,166,35,0.1); border-style: solid; }
 
-  .presets-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-  .add-btn { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        /* Presets page */
+        .collection-tabs { display: flex; background: var(--surface); border-radius: 12px; padding: 4px; margin-bottom: 24px; border: 1px solid var(--border); }
+        .col-tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.2s; border: none; background: none; }
+        .col-tab.active { background: var(--card); color: var(--text); }
+        .col-tab.party.active { color: var(--accent); }
+        .col-tab.personal.active { color: var(--accent2); }
 
-  .preset-list { display: flex; flex-direction: column; gap: 10px; }
-  .preset-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: border-color 0.15s; }
-  .preset-card:active { border-color: var(--accent); }
-  .party-card { border-left: 3px solid rgba(233,69,96,0.5); }
-  .preset-bpm { font-size: 26px; font-weight: 800; color: var(--accent); min-width: 56px; font-variant-numeric: tabular-nums; }
-  .preset-info { flex: 1; }
-  .preset-title { font-size: 15px; font-weight: 600; }
-  .preset-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .preset-del { background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; line-height: 1; }
-  .preset-del:active { color: var(--accent); }
-  .preset-handle { color: var(--text2); font-size: 18px; padding: 4px 8px 4px 0; cursor: grab; user-select: none; touch-action: none; line-height: 1; opacity: 0.5; }
-  .preset-card.dragging { opacity: 0.4; border-color: var(--accent); }
-  .preset-card.drag-over { border-color: var(--accent2); background: rgba(245,166,35,0.06); }
+        .presets-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .add-btn { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
-  .empty-state { text-align: center; padding: 48px 24px; color: var(--text2); }
-  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
-  .empty-state p { font-size: 15px; }
+        .preset-list { display: flex; flex-direction: column; gap: 12px; }
+        .preset-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform 0.1s; position: relative; overflow: hidden; }
+        .preset-card:active { transform: scale(0.98); border-color: var(--accent); }
+        .party-card { border-left: 4px solid var(--accent); }
+        .personal-card { border-left: 4px solid var(--accent2); }
+        .preset-bpm { font-size: 24px; font-weight: 800; color: var(--accent); min-width: 50px; font-variant-numeric: tabular-nums; }
+        .preset-info { flex: 1; }
+        .preset-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+        .preset-meta { font-size: 12px; color: var(--text2); }
+        .preset-del { background: none; border: none; color: var(--text2); font-size: 22px; cursor: pointer; padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .preset-handle { color: var(--text2); font-size: 18px; padding: 4px; cursor: grab; opacity: 0.5; }
 
-  /* Modal */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: flex-end; justify-content: center; }
-  .modal-overlay.open { display: flex; }
-  .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); width: 100%; max-width: 480px; }
-  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
-  .input-group { margin-bottom: 16px; }
-  .input-group label { display: block; font-size: 12px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-  .input-group input { width: 100%; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 16px; outline: none; }
-  .input-group input:focus { border-color: var(--accent); }
-  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
-  .modal-btns .btn { padding: 14px; font-size: 15px; }
-</style>
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: flex-end; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--surface); border-radius: 24px 24px 0 0; padding: 24px 24px 40px; width: 100%; max-width: 480px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+        .modal h2 { font-size: 20px; font-weight: 700; margin-bottom: 24px; text-align: center; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-size: 12px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+        .input-group input { width: 100%; padding: 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 16px; outline: none; transition: border-color 0.2s; }
+        .input-group input:focus { border-color: var(--accent); }
+        .modal-btns { display: flex; gap: 12px; }
+        .modal-btns .btn { padding: 16px; }
+    </style>
 </head>
 <body>
 
 <header>
-  <h1>🕰️ Jeds Metronome</h1>
+    <h1>🕰️ Jeds Metronome</h1>
 </header>
 
 <div class="tab-bar">
-  <button class="tab active" id="tab-play" onclick="switchTab('play')">Play</button>
-  <button class="tab" id="tab-presets" onclick="switchTab('presets')">Presets</button>
-  <button class="tab" id="tab-new" onclick="newFromScratch()">New</button>
+    <button class="tab active" id="tab-play" onclick="switchTab('play')">Play</button>
+    <button class="tab" id="tab-presets" onclick="switchTab('presets')">Presets</button>
+    <button class="tab" id="tab-new" onclick="newFromScratch()">Reset</button>
 </div>
 
 <div class="page active" id="page-play">
-
-  <div class="song-header" id="song-header" style="display:none;">
-    <div class="song-header-inner">
-      <div class="song-header-name" id="song-header-name"></div>
-      <span class="song-collection-badge" id="song-collection-badge"></span>
+    <div class="song-header" id="song-header" style="display:none;">
+        <div class="song-header-inner">
+            <div class="song-header-name" id="song-header-name"></div>
+            <span class="song-collection-badge" id="song-collection-badge"></span>
+        </div>
     </div>
-  </div>
 
-  <div class="bpm-display">
-    <div class="bpm-label">Beats per minute</div>
-    <div class="bpm-number" id="bpm-display">120</div>
-    <div class="bpm-name" id="bpm-name"></div>
-  </div>
+    <div class="bpm-display">
+        <div class="bpm-label">Beats per minute</div>
+        <div class="bpm-number" id="bpm-display">120</div>
+        <div class="bpm-name" id="bpm-name">Moderato</div>
+    </div>
 
-  <div class="beat-row" id="beat-row"></div>
+    <div class="beat-row" id="beat-row"></div>
 
-  <div class="slider-wrap">
-    <input type="range" id="bpm-slider" min="30" max="300" value="120" step="1" oninput="onSliderChange(this.value)" />
-  </div>
+    <div class="slider-wrap">
+        <input type="range" id="bpm-slider" min="30" max="300" value="120" step="1" oninput="onSliderChange(this.value)" />
+    </div>
 
-  <div class="btn-row">
-    <button class="btn" onclick="adjustBpm(-5)">−5</button>
-    <button class="btn" onclick="adjustBpm(-1)">−1</button>
-    <button class="btn primary" id="play-btn" onclick="togglePlay()">▶ Start</button>
-    <button class="btn" onclick="adjustBpm(1)">+1</button>
-    <button class="btn" onclick="adjustBpm(5)">+5</button>
-  </div>
+    <div class="btn-row">
+        <button class="btn" onclick="adjustBpm(-5)">−5</button>
+        <button class="btn" onclick="adjustBpm(-1)">−1</button>
+        <button class="btn primary" id="play-btn" onclick="togglePlay()">▶ Start</button>
+        <button class="btn" onclick="adjustBpm(1)">+1</button>
+        <button class="btn" onclick="adjustBpm(5)">+5</button>
+    </div>
 
-  <p class="section-label">Time signature</p>
-  <div class="chip-row" id="timesig-chips"></div>
+    <p class="section-label">Time signature</p>
+    <div class="chip-row" id="timesig-chips"></div>
 
-  <p class="section-label">Sound</p>
-  <div class="chip-row" id="sound-chips"></div>
+    <p class="section-label">Sound</p>
+    <div class="chip-row" id="sound-chips"></div>
 
-  <button class="tap-btn" id="tap-btn" onclick="tapTempo()">Tap Tempo</button>
+    <button class="tap-btn" id="tap-btn" onclick="tapTempo()">Tap Tempo</button>
 
-  <div style="margin-top: 16px;">
-    <button class="btn" id="bottom-save-btn" onclick="bottomSaveAction()" style="width:100%; font-size:14px;">💾 Save to Personal</button>
-  </div>
-
+    <div style="margin-top: 24px;">
+        <button class="btn" id="bottom-save-btn" onclick="bottomSaveAction()" style="width:100%; font-size:14px; background: rgba(255,255,255,0.05)">💾 Save to Personal</button>
+    </div>
 </div>
 
 <div class="page" id="page-presets">
-  <div class="collection-tabs">
-    <button class="col-tab party active" id="col-tab-party" onclick="switchCollection('party')">🎉 Jed's Party</button>
-    <button class="col-tab personal" id="col-tab-personal" onclick="switchCollection('personal')">👤 Personal</button>
-  </div>
-  <div id="party-header" class="presets-header">
-    <p class="section-label" style="margin:0;">Hardcoded party songs</p>
-  </div>
-  <div id="personal-header" class="presets-header" style="display:none;">
-    <p class="section-label" style="margin:0;">Your songs</p>
-    <button class="add-btn" onclick="openAddModal()">+ Add</button>
-  </div>
-  <div class="preset-list" id="preset-list"></div>
+    <div class="collection-tabs">
+        <button class="col-tab active party" id="col-tab-party" onclick="switchCollection('party')">🎉 Jeds Party</button>
+        <button class="col-tab personal" id="col-tab-personal" onclick="switchCollection('personal')">👤 Personal</button>
+    </div>
+    
+    <div id="party-header" class="presets-header">
+        <p class="section-label" style="margin:0;">Jeds Songs</p>
+    </div>
+    
+    <div id="personal-header" class="presets-header" style="display:none;">
+        <p class="section-label" style="margin:0;">Personal Presets</p>
+        <button class="add-btn" onclick="openAddModal()">+ Add</button>
+    </div>
+
+    <div class="preset-list" id="preset-list"></div>
 </div>
 
 <!-- Save modal -->
 <div class="modal-overlay" id="save-modal">
-  <div class="modal">
-    <h2>Save to Personal</h2>
-    <div class="input-group">
-      <label>Song / preset name</label>
-      <input type="text" id="preset-title-input" placeholder="e.g. Wonderwall – Oasis" maxlength="60" />
+    <div class="modal">
+        <h2>Save to Personal</h2>
+        <div class="input-group">
+            <label>Song Name</label>
+            <input type="text" id="preset-title-input" placeholder="e.g. Wonderwall – Oasis" maxlength="60" />
+        </div>
+        <div class="input-group">
+            <label>BPM</label>
+            <input type="number" id="preset-bpm-input" min="30" max="300" />
+        </div>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal()">Cancel</button>
+            <button class="btn primary" onclick="savePreset()">Save Preset</button>
+        </div>
     </div>
-    <div class="input-group">
-      <label>BPM</label>
-      <input type="number" id="preset-bpm-input" min="30" max="300" />
-    </div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn primary" onclick="savePreset()">Save</button>
-    </div>
-  </div>
 </div>
 
 <!-- Add modal -->
 <div class="modal-overlay" id="add-modal">
-  <div class="modal">
-    <h2>Add to Personal</h2>
-    <div class="input-group">
-      <label>Song / preset name</label>
-      <input type="text" id="add-title-input" placeholder="e.g. Don't Stop Me Now – Queen" maxlength="60" />
+    <div class="modal">
+        <h2>Add to Personal</h2>
+        <div class="input-group">
+            <label>Song Name</label>
+            <input type="text" id="add-title-input" placeholder="e.g. Don't Stop Me Now – Queen" maxlength="60" />
+        </div>
+        <div class="input-group">
+            <label>BPM</label>
+            <input type="number" id="add-bpm-input" min="30" max="300" value="120" />
+        </div>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal()">Cancel</button>
+            <button class="btn primary" onclick="addPreset()">Add to List</button>
+        </div>
     </div>
-    <div class="input-group">
-      <label>BPM</label>
-      <input type="number" id="add-bpm-input" min="30" max="300" value="120" />
-    </div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn primary" onclick="addPreset()">Add</button>
-    </div>
-  </div>
 </div>
 
-<script src="jeds-party.js"></script>
 <script>
+/**
+ * DATA & INITIALIZATION
+ */
+const JEDS_PARTY_PRESETS = [
+    { title: "Almost There", bpm: 148, timeSig: 1, sound: "wood" },
+    { title: "Every Time She Sees the Moon", bpm: 126, timeSig: 1, sound: "wood" },
+    { title: "Sanctimony", bpm: 170, timeSig: 1, sound: "wood" },
+    { title: "Byron Blues", bpm: 136, timeSig: 1, sound: "wood" },
+    { title: "I'll Let You Down", bpm: 152, timeSig: 1, sound: "wood" },
+    { title: "What is the Matter", bpm: 126, timeSig: 1, sound: "wood" },
+    { title: "Round & Round", bpm: 166, timeSig: 1, sound: "wood" },
+    { title: "Holy Water", bpm: 126, timeSig: 1, sound: "wood" }
+];
+
 let bpm = 120;
 let playing = false;
 let timeSig = 4;
@@ -247,338 +256,354 @@ let currentPresetName = '';
 let currentPresetIdx = -1;
 let currentCollection = 'none';
 let soundType = 'click';
-let wakeLock = null;
 let activePresetsCollection = 'party';
 
 const timeSigs = [1,2,3,4,5,6,7,8];
 const sounds = ['click','beep','wood'];
 
+/**
+ * AUDIO ENGINE
+ */
 function initAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
 function playClick(time, isAccent) {
-  const ctx = audioCtx;
-  const gain = ctx.createGain();
-  gain.connect(ctx.destination);
-  if (soundType === 'click') {
-    const buf = ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*0.006));
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const filter = ctx.createBiquadFilter(); filter.type='bandpass'; filter.frequency.value=isAccent?1800:1000; filter.Q.value=2;
-    src.connect(filter); filter.connect(gain);
-    gain.gain.setValueAtTime(isAccent?1.0:0.65, time); src.start(time);
-  } else if (soundType === 'beep') {
-    const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.value=isAccent?1200:800; osc.connect(gain);
-    gain.gain.setValueAtTime(0,time); gain.gain.linearRampToValueAtTime(isAccent?0.5:0.3,time+0.002); gain.gain.exponentialRampToValueAtTime(0.001,time+0.06);
-    osc.start(time); osc.stop(time+0.07);
-  } else if (soundType === 'wood') {
-    const buf = ctx.createBuffer(1, ctx.sampleRate*0.05, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i=0;i<data.length;i++) data[i]=Math.sin(i*0.35)*Math.exp(-i/(ctx.sampleRate*0.012));
-    const src = ctx.createBufferSource(); src.buffer=buf; src.connect(gain);
-    gain.gain.setValueAtTime(isAccent?0.9:0.55,time); src.start(time);
-  }
+    const ctx = audioCtx;
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    
+    if (soundType === 'click') {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.006));
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = isAccent ? 1800 : 1000; filter.Q.value = 2;
+        src.connect(filter); filter.connect(gain);
+        gain.gain.setValueAtTime(isAccent ? 1.0 : 0.65, time); 
+        src.start(time);
+    } else if (soundType === 'beep') {
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = isAccent ? 1200 : 800; osc.connect(gain);
+        gain.gain.setValueAtTime(0, time); 
+        gain.gain.linearRampToValueAtTime(isAccent ? 0.5 : 0.3, time + 0.002); 
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+        osc.start(time); osc.stop(time + 0.07);
+    } else if (soundType === 'wood') {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = Math.sin(i * 0.35) * Math.exp(-i / (ctx.sampleRate * 0.012));
+        const src = ctx.createBufferSource(); src.buffer = buf; src.connect(gain);
+        gain.gain.setValueAtTime(isAccent ? 0.9 : 0.55, time); src.start(time);
+    }
 }
 
 function scheduler() {
-  while (nextNoteTime < audioCtx.currentTime + 0.1) {
-    const isAccent = !freeTime && beatIndex === 0;
-    playClick(nextNoteTime, isAccent);
-    const snap = freeTime ? 0 : (beatIndex===0 ? timeSig-1 : beatIndex-1);
-    scheduleBeatFlash(isAccent, nextNoteTime-audioCtx.currentTime, snap);
-    nextNoteTime += 60.0/bpm;
-    beatIndex = freeTime ? 0 : (beatIndex+1)%timeSig;
-  }
-  schedulerTimer = setTimeout(scheduler, 25);
+    while (nextNoteTime < audioCtx.currentTime + 0.1) {
+        const isAccent = !freeTime && beatIndex === 0;
+        playClick(nextNoteTime, isAccent);
+        const snap = freeTime ? 0 : (beatIndex === 0 ? timeSig - 1 : beatIndex - 1);
+        scheduleBeatFlash(isAccent, nextNoteTime - audioCtx.currentTime, beatIndex);
+        nextNoteTime += 60.0 / bpm;
+        beatIndex = freeTime ? 0 : (beatIndex + 1) % timeSig;
+    }
+    schedulerTimer = setTimeout(scheduler, 25);
 }
 
-function scheduleBeatFlash(isAccent, delay, snap) {
-  setTimeout(() => highlightBeat(snap, isAccent), Math.max(0, delay*1000-15));
+function scheduleBeatFlash(isAccent, delay, index) {
+    setTimeout(() => highlightBeat(index), Math.max(0, delay * 1000 - 15));
 }
 
-function highlightBeat(idx, isAccent) {
-  const dots = document.querySelectorAll('.beat-dot');
-  dots.forEach((d,i) => { d.classList.remove('active'); if(i===0) d.classList.add('accent'); });
-  if (dots[idx]) dots[idx].classList.add('active');
+function highlightBeat(idx) {
+    const dots = document.querySelectorAll('.beat-dot');
+    dots.forEach((d, i) => {
+        d.classList.remove('active');
+    });
+    if (dots[idx]) dots[idx].classList.add('active');
 }
 
+/**
+ * UI BUILDERS
+ */
 function buildBeatDots() {
-  const row = document.getElementById('beat-row');
-  row.innerHTML = '';
-  const count = freeTime ? 1 : timeSig;
-  for (let i=0;i<count;i++) {
-    const d = document.createElement('div');
-    d.className = 'beat-dot' + (!freeTime&&i===0&&timeSig>1?' accent':'');
-    row.appendChild(d);
-  }
-}
-
-async function togglePlay() {
-  if (playing) {
-    clearTimeout(schedulerTimer); playing=false; beatIndex=0;
-    document.querySelectorAll('.beat-dot').forEach(d=>d.classList.remove('active'));
-    document.getElementById('play-btn').textContent='▶ Start';
-    document.getElementById('play-btn').classList.remove('playing');
-    if (wakeLock) { wakeLock.release(); wakeLock=null; }
-  } else {
-    initAudio(); playing=true; beatIndex=0;
-    nextNoteTime=audioCtx.currentTime+0.05;
-    scheduler();
-    document.getElementById('play-btn').textContent='⏹ Stop';
-    document.getElementById('play-btn').classList.add('playing');
-    try { if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
-  }
-}
-
-document.addEventListener('visibilitychange', async () => {
-  if (wakeLock && document.visibilityState==='visible' && playing) {
-    try { wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
-  }
-});
-
-function setBpm(val) {
-  bpm = Math.min(300, Math.max(30, Math.round(val)));
-  document.getElementById('bpm-display').textContent = bpm;
-  const slider = document.getElementById('bpm-slider');
-  slider.value = bpm;
-  slider.style.setProperty('--val', ((bpm-30)/270*100).toFixed(1)+'%');
-}
-
-function adjustBpm(delta) { setBpm(bpm+delta); updateBpmName(); markPresetDirty(); }
-function onSliderChange(val) { setBpm(parseInt(val)); updateBpmName(); markPresetDirty(); }
-
-function updateBpmName() {
-  const names=[[20,39,'Larghissimo'],[40,59,'Largo'],[60,65,'Larghetto'],[66,75,'Adagio'],[76,107,'Andante'],[108,119,'Moderato'],[120,155,'Allegro'],[156,175,'Vivace'],[176,199,'Presto'],[200,300,'Prestissimo']];
-  const n=names.find(([lo,hi])=>bpm>=lo&&bpm<=hi);
-  document.getElementById('bpm-name').textContent=n?n[2]:'';
+    const row = document.getElementById('beat-row');
+    row.innerHTML = '';
+    const count = freeTime ? 1 : timeSig;
+    for (let i = 0; i < count; i++) {
+        const d = document.createElement('div');
+        d.className = 'beat-dot' + (!freeTime && i === 0 && timeSig > 1 ? ' accent' : '');
+        row.appendChild(d);
+    }
 }
 
 function buildChips() {
-  const tc = document.getElementById('timesig-chips');
-  timeSigs.forEach(n => {
-    const c = document.createElement('div');
-    c.className='chip'+(!freeTime&&n===timeSig?' active':'');
-    c.textContent=n+'/4';
-    c.onclick=()=>{ freeTime=false; timeSig=n; document.querySelectorAll('#timesig-chips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); buildBeatDots(); markPresetDirty(); };
-    tc.appendChild(c);
-  });
-  const freeChip=document.createElement('div');
-  freeChip.className='chip'+(freeTime?' active':'');
-  freeChip.textContent='Free';
-  freeChip.onclick=()=>{ freeTime=true; document.querySelectorAll('#timesig-chips .chip').forEach(x=>x.classList.remove('active')); freeChip.classList.add('active'); buildBeatDots(); markPresetDirty(); };
-  tc.appendChild(freeChip);
+    const tc = document.getElementById('timesig-chips');
+    tc.innerHTML = '';
+    timeSigs.forEach(n => {
+        const c = document.createElement('div');
+        c.className = 'chip' + (!freeTime && n === timeSig ? ' active' : '');
+        c.textContent = n + '/4';
+        c.onclick = () => { 
+            freeTime = false; timeSig = n; 
+            document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active')); 
+            c.classList.add('active'); buildBeatDots(); markPresetDirty(); 
+        };
+        tc.appendChild(c);
+    });
+    const freeChip = document.createElement('div');
+    freeChip.className = 'chip' + (freeTime ? ' active' : '');
+    freeChip.textContent = 'Free';
+    freeChip.onclick = () => { 
+        freeTime = true; 
+        document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active')); 
+        freeChip.classList.add('active'); buildBeatDots(); markPresetDirty(); 
+    };
+    tc.appendChild(freeChip);
 
-  const sc=document.getElementById('sound-chips');
-  sounds.forEach(s=>{
-    const c=document.createElement('div');
-    c.className='chip'+(s===soundType?' active':'');
-    c.textContent=s.charAt(0).toUpperCase()+s.slice(1);
-    c.onclick=()=>{ soundType=s; document.querySelectorAll('#sound-chips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); markPresetDirty(); };
-    sc.appendChild(c);
-  });
+    const sc = document.getElementById('sound-chips');
+    sc.innerHTML = '';
+    sounds.forEach(s => {
+        const c = document.createElement('div');
+        c.className = 'chip' + (s === soundType ? ' active' : '');
+        c.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+        c.onclick = () => { 
+            soundType = s; 
+            document.querySelectorAll('#sound-chips .chip').forEach(x => x.classList.remove('active')); 
+            c.classList.add('active'); markPresetDirty(); 
+        };
+        sc.appendChild(c);
+    });
+}
+
+/**
+ * CORE LOGIC
+ */
+async function togglePlay() {
+    if (playing) {
+        clearTimeout(schedulerTimer); playing = false; beatIndex = 0;
+        document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
+        document.getElementById('play-btn').textContent = '▶ Start';
+        document.getElementById('play-btn').classList.remove('playing');
+    } else {
+        initAudio(); playing = true; beatIndex = 0;
+        nextNoteTime = audioCtx.currentTime + 0.05;
+        scheduler();
+        document.getElementById('play-btn').textContent = '⏹ Stop';
+        document.getElementById('play-btn').classList.add('playing');
+    }
+}
+
+function setBpm(val) {
+    bpm = Math.min(300, Math.max(30, Math.round(val)));
+    document.getElementById('bpm-display').textContent = bpm;
+    const slider = document.getElementById('bpm-slider');
+    slider.value = bpm;
+    updateBpmName();
+}
+
+function adjustBpm(delta) { setBpm(bpm + delta); markPresetDirty(); }
+function onSliderChange(val) { setBpm(parseInt(val)); markPresetDirty(); }
+
+function updateBpmName() {
+    const names = [
+        [20, 39, 'Larghissimo'], [40, 59, 'Largo'], [60, 65, 'Larghetto'],
+        [66, 75, 'Adagio'], [76, 107, 'Andante'], [108, 119, 'Moderato'],
+        [120, 155, 'Allegro'], [156, 175, 'Vivace'], [176, 199, 'Presto'], [200, 300, 'Prestissimo']
+    ];
+    const n = names.find(([lo, hi]) => bpm >= lo && bpm <= hi);
+    document.getElementById('bpm-name').textContent = n ? n[2] : '';
 }
 
 function tapTempo() {
-  const now=Date.now();
-  tapTimes=tapTimes.filter(t=>now-t<3000); tapTimes.push(now);
-  if (tapTimes.length>=2) {
-    const intervals=[]; for(let i=1;i<tapTimes.length;i++) intervals.push(tapTimes[i]-tapTimes[i-1]);
-    setBpm(Math.round(60000/(intervals.reduce((a,b)=>a+b,0)/intervals.length))); updateBpmName();
-  }
-  const btn=document.getElementById('tap-btn');
-  btn.textContent=tapTimes.length<2?'Tap again…':'Tap Tempo  ('+tapTimes.length+' taps)';
-  setTimeout(()=>{ if(Date.now()-tapTimes[tapTimes.length-1]>2000) btn.textContent='Tap Tempo'; },2200);
+    const now = Date.now();
+    tapTimes = tapTimes.filter(t => now - t < 3000); 
+    tapTimes.push(now);
+    if (tapTimes.length >= 2) {
+        const intervals = []; 
+        for (let i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i - 1]);
+        const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        setBpm(Math.round(60000 / avg));
+    }
+    const btn = document.getElementById('tap-btn');
+    btn.textContent = tapTimes.length < 2 ? 'Keep tapping...' : 'Tapping... (' + tapTimes.length + ')';
+    setTimeout(() => { if (Date.now() - tapTimes[tapTimes.length - 1] > 2000) btn.textContent = 'Tap Tempo'; }, 2200);
 }
 
+/**
+ * TABS & PERSISTENCE
+ */
 function switchTab(tab) {
-  document.getElementById('tab-play').classList.toggle('active', tab==='play');
-  document.getElementById('tab-presets').classList.toggle('active', tab==='presets');
-  document.getElementById('tab-new').classList.remove('active');
-  document.getElementById('page-play').classList.toggle('active', tab==='play');
-  document.getElementById('page-presets').classList.toggle('active', tab==='presets');
-  if (tab==='presets') renderPresets();
+    document.getElementById('tab-play').classList.toggle('active', tab === 'play');
+    document.getElementById('tab-presets').classList.toggle('active', tab === 'presets');
+    document.getElementById('page-play').classList.toggle('active', tab === 'play');
+    document.getElementById('page-presets').classList.toggle('active', tab === 'presets');
+    if (tab === 'presets') renderPresets();
 }
 
 function switchCollection(col) {
-  activePresetsCollection=col;
-  document.getElementById('col-tab-party').classList.toggle('active', col==='party');
-  document.getElementById('col-tab-personal').classList.toggle('active', col==='personal');
-  document.getElementById('party-header').style.display=col==='party'?'flex':'none';
-  document.getElementById('personal-header').style.display=col==='personal'?'flex':'none';
-  renderPresets();
+    activePresetsCollection = col;
+    document.getElementById('col-tab-party').classList.toggle('active', col === 'party');
+    document.getElementById('col-tab-personal').classList.toggle('active', col === 'personal');
+    document.getElementById('party-header').style.display = col === 'party' ? 'flex' : 'none';
+    document.getElementById('personal-header').style.display = col === 'personal' ? 'flex' : 'none';
+    renderPresets();
 }
 
-function getPersonalPresets() { try { return JSON.parse(localStorage.getItem('metro_presets')||'[]'); } catch { return []; } }
+function getPersonalPresets() { 
+    try { return JSON.parse(localStorage.getItem('metro_presets') || '[]'); } 
+    catch { return []; } 
+}
 function savePersonalPresets(arr) { localStorage.setItem('metro_presets', JSON.stringify(arr)); }
 
 function renderPresets() {
-  const list=document.getElementById('preset-list');
-  activePresetsCollection==='party' ? renderPartyPresets(list) : renderPersonalPresets(list);
-}
+    const list = document.getElementById('preset-list');
+    list.innerHTML = '';
+    
+    const collection = activePresetsCollection === 'party' ? JEDS_PARTY_PRESETS : getPersonalPresets();
+    
+    if (collection.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text2);">
+            <div style="font-size:40px; margin-bottom:10px;">Empty</div>
+            <p>Save songs to see them here.</p>
+        </div>`;
+        return;
+    }
 
-function renderPartyPresets(list) {
-  list.innerHTML='';
-  if (!window.JEDS_PARTY_PRESETS||JEDS_PARTY_PRESETS.length===0) {
-    list.innerHTML='<div class="empty-state"><div class="icon">🎉</div><p>No party presets found.<br>Edit jeds-party.js to add songs.</p></div>'; return;
-  }
-  JEDS_PARTY_PRESETS.forEach((p,idx)=>{
-    const card=document.createElement('div');
-    card.className='preset-card party-card';
-    const ts=p.freeTime?' · Free':` · ${p.timeSig}/4`;
-    const snd=p.sound?` · ${p.sound.charAt(0).toUpperCase()+p.sound.slice(1)}`:'';
-    card.innerHTML=`<div class="preset-bpm">${p.bpm}</div><div class="preset-info"><div class="preset-title">${escHtml(p.title)}</div><div class="preset-meta">BPM ${p.bpm}${ts}${snd}</div></div>`;
-    card.onclick=()=>loadPreset(p,'party',idx);
-    list.appendChild(card);
-  });
-}
-
-function renderPersonalPresets(list) {
-  list.innerHTML='';
-  const presets=getPersonalPresets();
-  if (presets.length===0) { list.innerHTML='<div class="empty-state"><div class="icon">🎵</div><p>No personal presets yet.<br>Save a BPM from the Play tab.</p></div>'; return; }
-  presets.forEach((p,idx)=>{
-    const card=document.createElement('div');
-    card.className='preset-card'; card.dataset.idx=idx;
-    const ts=p.freeTime?' · Free':(p.timeSig?` · ${p.timeSig}/4`:'');
-    const snd=p.sound?` · ${p.sound.charAt(0).toUpperCase()+p.sound.slice(1)}`:'';
-    card.innerHTML=`<div class="preset-handle">⠿</div><div class="preset-bpm">${p.bpm}</div><div class="preset-info"><div class="preset-title">${escHtml(p.title)}</div><div class="preset-meta">BPM ${p.bpm}${ts}${snd}</div></div><button class="preset-del" onclick="deletePreset(${idx},event)">×</button>`;
-    card.onclick=(e)=>{ if(e.target.classList.contains('preset-del')||e.target.classList.contains('preset-handle')) return; loadPreset(p,'personal',idx); };
-    list.appendChild(card);
-  });
-  setupDrag();
-}
-
-function setupDrag() {
-  const list=document.getElementById('preset-list');
-  let drag=null, startIdx=0;
-  list.querySelectorAll('.preset-handle').forEach(h=>{
-    h.addEventListener('touchstart',e=>{ e.stopPropagation(); drag=h.closest('.preset-card'); startIdx=parseInt(drag.dataset.idx); drag.classList.add('dragging'); },{passive:true});
-  });
-  list.addEventListener('touchmove',e=>{ if(!drag) return; e.preventDefault(); const y=e.touches[0].clientY; const cards=[...list.querySelectorAll('.preset-card')]; cards.forEach(c=>c.classList.remove('drag-over')); const tgt=cards.find(c=>{ if(c===drag) return false; const r=c.getBoundingClientRect(); return y>=r.top&&y<=r.bottom; }); if(tgt) tgt.classList.add('drag-over'); },{passive:false});
-  list.addEventListener('touchend',()=>{ if(!drag) return; const cards=[...list.querySelectorAll('.preset-card')]; const tgt=cards.find(c=>c.classList.contains('drag-over')); if(tgt){ const toIdx=parseInt(tgt.dataset.idx); const p=getPersonalPresets(); const [m]=p.splice(startIdx,1); p.splice(toIdx,0,m); savePersonalPresets(p); renderPresets(); } else { drag.classList.remove('dragging'); cards.forEach(c=>c.classList.remove('drag-over')); } drag=null; });
+    collection.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.className = 'preset-card ' + (activePresetsCollection === 'party' ? 'party-card' : 'personal-card');
+        const ts = p.freeTime ? ' · Free' : (p.timeSig ? ` · ${p.timeSig}/4` : '');
+        card.innerHTML = `
+            <div class="preset-bpm">${p.bpm}</div>
+            <div class="preset-info">
+                <div class="preset-title">${escHtml(p.title)}</div>
+                <div class="preset-meta">BPM ${p.bpm}${ts}</div>
+            </div>
+            ${activePresetsCollection === 'personal' ? `<button class="preset-del" onclick="deletePreset(${idx},event)">×</button>` : ''}
+        `;
+        card.onclick = (e) => { 
+            if (e.target.classList.contains('preset-del')) return;
+            loadPreset(p, activePresetsCollection, idx); 
+        };
+        list.appendChild(card);
+    });
 }
 
 function loadPreset(p, collection, idx) {
-  setBpm(p.bpm); timeSig=p.timeSig||4; freeTime=p.freeTime||false; soundType=p.sound||'click';
-  document.querySelectorAll('#timesig-chips .chip').forEach((c,i)=>c.classList.toggle('active',!freeTime&&timeSigs[i]===timeSig));
-  const fc=document.querySelector('#timesig-chips .chip:last-child'); if(fc) fc.classList.toggle('active',freeTime);
-  document.querySelectorAll('#sound-chips .chip').forEach(c=>c.classList.toggle('active',c.textContent.toLowerCase()===soundType));
-  buildBeatDots(); updateBpmName();
-  currentPresetName=p.title; currentPresetIdx=idx; currentCollection=collection;
-  updateSongHeader(); switchTab('play');
+    setBpm(p.bpm);
+    timeSig = p.timeSig || 4;
+    freeTime = p.freeTime || false;
+    soundType = p.sound || 'click';
+    buildChips();
+    buildBeatDots();
+    currentPresetName = p.title;
+    currentPresetIdx = idx;
+    currentCollection = collection;
+    updateSongHeader();
+    switchTab('play');
 }
 
 function updateSongHeader() {
-  const header=document.getElementById('song-header');
-  const nameEl=document.getElementById('song-header-name');
-  const badge=document.getElementById('song-collection-badge');
-  const btn=document.getElementById('bottom-save-btn');
-  if (currentPresetIdx>=0&&currentPresetName) {
-    header.style.display='block';
-    nameEl.textContent=currentPresetName;
-    if (currentCollection==='party') {
-      badge.textContent="Jed's Party"; badge.className='song-collection-badge party';
-      btn.textContent='💾 Save to Personal'; btn.style.borderColor=''; btn.style.color='';
+    const header = document.getElementById('song-header');
+    const nameEl = document.getElementById('song-header-name');
+    const badge = document.getElementById('song-collection-badge');
+    const btn = document.getElementById('bottom-save-btn');
+    
+    if (currentPresetIdx >= 0 && currentPresetName) {
+        header.style.display = 'block';
+        nameEl.textContent = currentPresetName;
+        if (currentCollection === 'party') {
+            badge.textContent = "Party"; badge.className = 'song-collection-badge party';
+            btn.textContent = '💾 Save to Personal';
+        } else {
+            badge.textContent = 'Personal'; badge.className = 'song-collection-badge personal';
+            btn.textContent = '💾 Update "' + currentPresetName + '"';
+        }
     } else {
-      badge.textContent='Personal'; badge.className='song-collection-badge personal';
-      btn.textContent='💾 Update "'+currentPresetName+'"'; btn.style.borderColor='var(--accent2)'; btn.style.color='var(--accent2)';
+        header.style.display = 'none';
+        btn.textContent = '💾 Save to Personal';
     }
-  } else {
-    header.style.display='none';
-    btn.textContent='💾 Save to Personal'; btn.style.borderColor=''; btn.style.color='';
-  }
 }
 
 function markPresetDirty() {
-  if (currentPresetIdx>=0&&currentCollection==='personal') {
-    const btn=document.getElementById('bottom-save-btn');
-    btn.textContent='💾 Update "'+currentPresetName+'"'; btn.style.borderColor='var(--accent2)'; btn.style.color='var(--accent2)';
-  }
+    if (currentPresetIdx >= 0 && currentCollection === 'personal') {
+        const btn = document.getElementById('bottom-save-btn');
+        btn.textContent = '💾 Update (modified)';
+        btn.style.borderColor = 'var(--accent2)';
+    }
 }
 
 function bottomSaveAction() {
-  if (currentPresetIdx>=0&&currentCollection==='personal') { updateCurrentPreset(); } else { openSaveModal(); }
-}
-
-function updateCurrentPreset() {
-  const presets=getPersonalPresets();
-  if (!presets[currentPresetIdx]) return;
-  presets[currentPresetIdx]={title:currentPresetName,bpm,timeSig,freeTime,sound:soundType};
-  savePersonalPresets(presets);
-  const btn=document.getElementById('bottom-save-btn');
-  btn.textContent='✓ Saved!';
-  setTimeout(()=>{ btn.textContent='💾 Update "'+currentPresetName+'"'; },1500);
-}
-
-function clearPresetContext() {
-  currentPresetName=''; currentPresetIdx=-1; currentCollection='none'; updateSongHeader();
+    if (currentPresetIdx >= 0 && currentCollection === 'personal') {
+        const presets = getPersonalPresets();
+        presets[currentPresetIdx] = { title: currentPresetName, bpm, timeSig, freeTime, sound: soundType };
+        savePersonalPresets(presets);
+        const btn = document.getElementById('bottom-save-btn');
+        btn.textContent = '✓ Saved!';
+        setTimeout(updateSongHeader, 1500);
+    } else {
+        openSaveModal();
+    }
 }
 
 function newFromScratch() {
-  if (playing) togglePlay();
-  clearPresetContext();
-  setBpm(120); timeSig=4; freeTime=false; soundType='click';
-  document.querySelectorAll('#timesig-chips .chip').forEach((c,i)=>c.classList.toggle('active',timeSigs[i]===4));
-  const fc=document.querySelector('#timesig-chips .chip:last-child'); if(fc) fc.classList.remove('active');
-  document.querySelectorAll('#sound-chips .chip').forEach(c=>c.classList.toggle('active',c.textContent.toLowerCase()==='click'));
-  buildBeatDots(); updateBpmName(); switchTab('play');
+    if (playing) togglePlay();
+    currentPresetName = ''; currentPresetIdx = -1; currentCollection = 'none';
+    updateSongHeader();
+    setBpm(120); timeSig = 4; freeTime = false; soundType = 'click';
+    buildChips(); buildBeatDots(); switchTab('play');
 }
 
 function deletePreset(idx, e) {
-  e.stopPropagation();
-  const presets=getPersonalPresets(); presets.splice(idx,1); savePersonalPresets(presets);
-  if (currentCollection==='personal'&&currentPresetIdx===idx) clearPresetContext();
-  renderPresets();
+    e.stopPropagation();
+    const presets = getPersonalPresets();
+    presets.splice(idx, 1);
+    savePersonalPresets(presets);
+    renderPresets();
 }
 
 function openSaveModal() {
-  document.getElementById('preset-title-input').value=currentPresetName||'';
-  document.getElementById('preset-bpm-input').value=bpm;
-  document.getElementById('save-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('preset-title-input').focus(),100);
+    document.getElementById('preset-title-input').value = currentPresetName || '';
+    document.getElementById('preset-bpm-input').value = bpm;
+    document.getElementById('save-modal').classList.add('open');
 }
 
 function openAddModal() {
-  document.getElementById('add-title-input').value='';
-  document.getElementById('add-bpm-input').value=120;
-  document.getElementById('add-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('add-title-input').focus(),100);
+    document.getElementById('add-title-input').value = '';
+    document.getElementById('add-modal').classList.add('open');
 }
 
-function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); }
+function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
 
 function savePreset() {
-  const title=document.getElementById('preset-title-input').value.trim();
-  const bpmVal=parseInt(document.getElementById('preset-bpm-input').value);
-  if (!title) { alert('Please enter a song name.'); return; }
-  if (!bpmVal||bpmVal<30||bpmVal>300) { alert('BPM must be between 30 and 300.'); return; }
-  const presets=getPersonalPresets();
-  presets.unshift({title,bpm:bpmVal,timeSig,freeTime,sound:soundType});
-  savePersonalPresets(presets); closeModal();
-  currentPresetName=title; currentPresetIdx=0; currentCollection='personal';
-  updateSongHeader();
+    const title = document.getElementById('preset-title-input').value.trim();
+    if (!title) return;
+    const presets = getPersonalPresets();
+    presets.unshift({ title, bpm, timeSig, freeTime, sound: soundType });
+    savePersonalPresets(presets);
+    closeModal();
+    loadPreset(presets[0], 'personal', 0);
 }
 
 function addPreset() {
-  const title=document.getElementById('add-title-input').value.trim();
-  const bpmVal=parseInt(document.getElementById('add-bpm-input').value);
-  if (!title) { alert('Please enter a song name.'); return; }
-  if (!bpmVal||bpmVal<30||bpmVal>300) { alert('BPM must be between 30 and 300.'); return; }
-  const presets=getPersonalPresets();
-  presets.unshift({title,bpm:bpmVal,timeSig:4,freeTime:false,sound:'click'});
-  savePersonalPresets(presets); closeModal(); renderPresets();
+    const title = document.getElementById('add-title-input').value.trim();
+    const bpmVal = parseInt(document.getElementById('add-bpm-input').value);
+    if (!title) return;
+    const presets = getPersonalPresets();
+    presets.unshift({ title, bpm: bpmVal, timeSig: 4, freeTime: false, sound: 'click' });
+    savePersonalPresets(presets);
+    closeModal();
+    renderPresets();
 }
 
-function escHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) closeModal(); }));
-
-buildChips(); buildBeatDots(); setBpm(120); updateBpmName();
-
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+/**
+ * INIT
+ */
+buildChips();
+buildBeatDots();
+updateBpmName();
 </script>
 </body>
 </html>
