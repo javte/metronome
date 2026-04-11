@@ -249,6 +249,7 @@ let timeSig = 4;
 let freeTime = false;
 let beatIndex = 0;
 let audioCtx = null;
+let audioInitPromise = null;
 let nextNoteTime = 0;
 let schedulerTimer = null;
 let tapTimes = [];
@@ -265,8 +266,27 @@ const sounds = ['click','beep','wood'];
  * AUDIO ENGINE
  */
 function initAudio() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioInitPromise) return audioInitPromise;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return Promise.reject(new Error('Web Audio API is not supported in this browser.'));
+
+    audioInitPromise = (async () => {
+        if (!audioCtx) audioCtx = new AudioContextClass();
+        if (audioCtx.state !== 'running') await audioCtx.resume();
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.00001;
+        src.connect(gain);
+        gain.connect(audioCtx.destination);
+        src.start(audioCtx.currentTime);
+        src.stop(audioCtx.currentTime + 0.001);
+        return audioCtx;
+    })().finally(() => {
+        audioInitPromise = null;
+    });
+
+    return audioInitPromise;
 }
 
 function playClick(time, isAccent) {
@@ -381,11 +401,19 @@ function buildChips() {
 async function togglePlay() {
     if (playing) {
         clearTimeout(schedulerTimer); playing = false; beatIndex = 0;
+        schedulerTimer = null;
         document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
         document.getElementById('play-btn').textContent = '▶ Start';
         document.getElementById('play-btn').classList.remove('playing');
     } else {
-        initAudio(); playing = true; beatIndex = 0;
+        try {
+            await initAudio();
+        } catch (err) {
+            console.error('Unable to start audio playback.', err);
+            return;
+        }
+        if (!audioCtx || audioCtx.state !== 'running') return;
+        playing = true; beatIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.05;
         scheduler();
         document.getElementById('play-btn').textContent = '⏹ Stop';
@@ -598,9 +626,16 @@ function addPreset() {
 
 function escHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+function unlockAudioFromGesture() {
+    initAudio().catch(err => console.error('Unable to unlock audio.', err));
+}
+
 /**
  * INIT
  */
+['pointerdown', 'touchstart', 'keydown'].forEach(eventName => {
+    document.addEventListener(eventName, unlockAudioFromGesture, { once: true, passive: true });
+});
 buildChips();
 buildBeatDots();
 updateBpmName();
