@@ -1,6 +1,6 @@
 {
   "name": "Jeds Metronome",
-  "short_name": "Jeds Metro",
+  "short_name": "Jeds Metronome",
   "description": "Offline metronome with BPM presets for your songs",
   "start_url": "/",
   "display": "standalone",
