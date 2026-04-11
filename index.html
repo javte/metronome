@@ -268,10 +268,16 @@ const sounds = ['click','beep','wood'];
 
 // ---- Audio ----
 
-async function initAudio() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// On iOS, AudioContext must be created AND resumed synchronously
+// within the user gesture call stack — never inside an await.
+function initAudioSync() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // .resume() returns a Promise but we call it synchronously here
+    // so iOS registers it as part of the gesture. We don't need to await it.
     if (audioCtx.state === 'suspended') {
-        try { await audioCtx.resume(); } catch(e) {}
+        audioCtx.resume();
     }
 }
 
@@ -387,7 +393,15 @@ async function togglePlay() {
         document.getElementById('play-btn').classList.remove('playing');
         if (wakeLock) { wakeLock.release(); wakeLock = null; }
     } else {
-        await initAudio();
+        // Synchronous init — must happen before any await to satisfy iOS gesture requirement
+        initAudioSync();
+
+        // Wait up to 500ms for context to reach 'running' state
+        for (let i = 0; i < 50; i++) {
+            if (audioCtx.state === 'running') break;
+            await new Promise(r => setTimeout(r, 10));
+        }
+
         playing = true; beatIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.05;
         scheduler();
