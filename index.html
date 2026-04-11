@@ -95,7 +95,7 @@
         .add-btn { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
         .preset-list { display: flex; flex-direction: column; gap: 12px; }
-        .preset-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform 0.1s; position: relative; overflow: hidden; }
+        .preset-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform 0.1s; }
         .preset-card:active { transform: scale(0.98); border-color: var(--accent); }
         .party-card { border-left: 4px solid var(--accent); }
         .personal-card { border-left: 4px solid var(--accent2); }
@@ -104,7 +104,9 @@
         .preset-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
         .preset-meta { font-size: 12px; color: var(--text2); }
         .preset-del { background: none; border: none; color: var(--text2); font-size: 22px; cursor: pointer; padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .preset-handle { color: var(--text2); font-size: 18px; padding: 4px; cursor: grab; opacity: 0.5; }
+        .preset-handle { color: var(--text2); font-size: 18px; padding: 4px 8px 4px 0; cursor: grab; user-select: none; touch-action: none; line-height: 1; opacity: 0.5; }
+        .preset-card.dragging { opacity: 0.4; border-color: var(--accent); }
+        .preset-card.drag-over { border-color: var(--accent2); background: rgba(245,166,35,0.06); }
 
         /* Modal */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: flex-end; justify-content: center; }
@@ -177,11 +179,11 @@
         <button class="col-tab active party" id="col-tab-party" onclick="switchCollection('party')">🎉 Jeds Party</button>
         <button class="col-tab personal" id="col-tab-personal" onclick="switchCollection('personal')">👤 Personal</button>
     </div>
-    
+
     <div id="party-header" class="presets-header">
         <p class="section-label" style="margin:0;">Jeds Songs</p>
     </div>
-    
+
     <div id="personal-header" class="presets-header" style="display:none;">
         <p class="section-label" style="margin:0;">Personal Presets</p>
         <button class="add-btn" onclick="openAddModal()">+ Add</button>
@@ -196,7 +198,7 @@
         <h2>Save to Personal</h2>
         <div class="input-group">
             <label>Song Name</label>
-            <input type="text" id="preset-title-input" placeholder="e.g. Wonderwall – Oasis" maxlength="60" />
+            <input type="text" id="preset-title-input" placeholder="e.g. Wonderwall" maxlength="60" />
         </div>
         <div class="input-group">
             <label>BPM</label>
@@ -229,19 +231,21 @@
 </div>
 
 <script>
-/**
- * DATA & INITIALIZATION
- */
+// ============================================================
+//  JEDS PARTY — edit this list to add/remove/change songs
+//  Fields: title, bpm, timeSig, freeTime, sound ('click'|'beep'|'wood')
+// ============================================================
 const JEDS_PARTY_PRESETS = [
-    { title: "Almost There", bpm: 148, timeSig: 1, sound: "wood" },
-    { title: "Every Time She Sees the Moon", bpm: 126, timeSig: 1, sound: "wood" },
-    { title: "Sanctimony", bpm: 170, timeSig: 1, sound: "wood" },
-    { title: "Byron Blues", bpm: 136, timeSig: 1, sound: "wood" },
-    { title: "I'll Let You Down", bpm: 152, timeSig: 1, sound: "wood" },
-    { title: "What is the Matter", bpm: 126, timeSig: 1, sound: "wood" },
-    { title: "Round & Round", bpm: 166, timeSig: 1, sound: "wood" },
-    { title: "Holy Water", bpm: 126, timeSig: 1, sound: "wood" }
+    { title: "Almost There",                bpm: 148, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "Every Time She Sees the Moon", bpm: 126, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "Sanctimony",                  bpm: 170, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "Byron Blues",                 bpm: 136, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "I'll Let You Down",           bpm: 152, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "What is the Matter",          bpm: 126, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "Round and Round",             bpm: 166, timeSig: 1, freeTime: false, sound: "wood" },
+    { title: "Holy Water",                  bpm: 126, timeSig: 1, freeTime: false, sound: "wood" }
 ];
+// ============================================================
 
 let bpm = 120;
 let playing = false;
@@ -249,8 +253,6 @@ let timeSig = 4;
 let freeTime = false;
 let beatIndex = 0;
 let audioCtx = null;
-let audioInitPromise = null;
-let audioUnlockPending = false;
 let nextNoteTime = 0;
 let schedulerTimer = null;
 let tapTimes = [];
@@ -258,51 +260,26 @@ let currentPresetName = '';
 let currentPresetIdx = -1;
 let currentCollection = 'none';
 let soundType = 'click';
+let wakeLock = null;
 let activePresetsCollection = 'party';
 
 const timeSigs = [1,2,3,4,5,6,7,8];
 const sounds = ['click','beep','wood'];
-const AUDIO_PRIMER_GAIN = 0.00001;
-const AUDIO_PRIMER_DURATION = 0.001;
-const AUDIO_UNLOCK_EVENTS = ['pointerdown', 'touchstart', 'keydown'];
 
-/**
- * AUDIO ENGINE
- */
-function initAudio() {
-    if (audioInitPromise) return audioInitPromise;
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return Promise.reject(new Error('Web Audio API is not supported in this browser.'));
+// ---- Audio ----
 
-    const pendingInit = (async () => {
-        if (!audioCtx) audioCtx = new AudioContextClass();
-        if (audioCtx.state !== 'running') await audioCtx.resume();
-        const src = audioCtx.createBufferSource();
-        src.buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
-        const gain = audioCtx.createGain();
-        gain.gain.value = AUDIO_PRIMER_GAIN;
-        src.connect(gain);
-        gain.connect(audioCtx.destination);
-        src.onended = () => {
-            src.disconnect();
-            gain.disconnect();
-        };
-        src.start(audioCtx.currentTime);
-        src.stop(audioCtx.currentTime + AUDIO_PRIMER_DURATION);
-        return audioCtx;
-    })();
-
-    audioInitPromise = pendingInit;
-    return pendingInit.finally(() => {
-        if (audioInitPromise === pendingInit) audioInitPromise = null;
-    });
+async function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch(e) {}
+    }
 }
 
 function playClick(time, isAccent) {
     const ctx = audioCtx;
     const gain = ctx.createGain();
     gain.connect(ctx.destination);
-    
+
     if (soundType === 'click') {
         const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
         const data = buf.getChannelData(0);
@@ -310,12 +287,12 @@ function playClick(time, isAccent) {
         const src = ctx.createBufferSource(); src.buffer = buf;
         const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = isAccent ? 1800 : 1000; filter.Q.value = 2;
         src.connect(filter); filter.connect(gain);
-        gain.gain.setValueAtTime(isAccent ? 1.0 : 0.65, time); 
+        gain.gain.setValueAtTime(isAccent ? 1.0 : 0.65, time);
         src.start(time);
     } else if (soundType === 'beep') {
         const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = isAccent ? 1200 : 800; osc.connect(gain);
-        gain.gain.setValueAtTime(0, time); 
-        gain.gain.linearRampToValueAtTime(isAccent ? 0.5 : 0.3, time + 0.002); 
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(isAccent ? 0.5 : 0.3, time + 0.002);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
         osc.start(time); osc.stop(time + 0.07);
     } else if (soundType === 'wood') {
@@ -331,29 +308,25 @@ function scheduler() {
     while (nextNoteTime < audioCtx.currentTime + 0.1) {
         const isAccent = !freeTime && beatIndex === 0;
         playClick(nextNoteTime, isAccent);
-        const snap = freeTime ? 0 : (beatIndex === 0 ? timeSig - 1 : beatIndex - 1);
-        scheduleBeatFlash(isAccent, nextNoteTime - audioCtx.currentTime, beatIndex);
+        scheduleBeatFlash(nextNoteTime - audioCtx.currentTime, beatIndex);
         nextNoteTime += 60.0 / bpm;
         beatIndex = freeTime ? 0 : (beatIndex + 1) % timeSig;
     }
     schedulerTimer = setTimeout(scheduler, 25);
 }
 
-function scheduleBeatFlash(isAccent, delay, index) {
+function scheduleBeatFlash(delay, index) {
     setTimeout(() => highlightBeat(index), Math.max(0, delay * 1000 - 15));
 }
 
 function highlightBeat(idx) {
     const dots = document.querySelectorAll('.beat-dot');
-    dots.forEach((d, i) => {
-        d.classList.remove('active');
-    });
+    dots.forEach(d => d.classList.remove('active'));
     if (dots[idx]) dots[idx].classList.add('active');
 }
 
-/**
- * UI BUILDERS
- */
+// ---- UI builders ----
+
 function buildBeatDots() {
     const row = document.getElementById('beat-row');
     row.innerHTML = '';
@@ -372,20 +345,20 @@ function buildChips() {
         const c = document.createElement('div');
         c.className = 'chip' + (!freeTime && n === timeSig ? ' active' : '');
         c.textContent = n + '/4';
-        c.onclick = () => { 
-            freeTime = false; timeSig = n; 
-            document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active')); 
-            c.classList.add('active'); buildBeatDots(); markPresetDirty(); 
+        c.onclick = () => {
+            freeTime = false; timeSig = n;
+            document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active'); buildBeatDots(); markPresetDirty();
         };
         tc.appendChild(c);
     });
     const freeChip = document.createElement('div');
     freeChip.className = 'chip' + (freeTime ? ' active' : '');
     freeChip.textContent = 'Free';
-    freeChip.onclick = () => { 
-        freeTime = true; 
-        document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active')); 
-        freeChip.classList.add('active'); buildBeatDots(); markPresetDirty(); 
+    freeChip.onclick = () => {
+        freeTime = true;
+        document.querySelectorAll('#timesig-chips .chip').forEach(x => x.classList.remove('active'));
+        freeChip.classList.add('active'); buildBeatDots(); markPresetDirty();
     };
     tc.appendChild(freeChip);
 
@@ -395,46 +368,45 @@ function buildChips() {
         const c = document.createElement('div');
         c.className = 'chip' + (s === soundType ? ' active' : '');
         c.textContent = s.charAt(0).toUpperCase() + s.slice(1);
-        c.onclick = () => { 
-            soundType = s; 
-            document.querySelectorAll('#sound-chips .chip').forEach(x => x.classList.remove('active')); 
-            c.classList.add('active'); markPresetDirty(); 
+        c.onclick = () => {
+            soundType = s;
+            document.querySelectorAll('#sound-chips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active'); markPresetDirty();
         };
         sc.appendChild(c);
     });
 }
 
-/**
- * CORE LOGIC
- */
+// ---- Core logic ----
+
 async function togglePlay() {
     if (playing) {
-        clearTimeout(schedulerTimer); playing = false; beatIndex = 0;
-        schedulerTimer = null;
+        clearTimeout(schedulerTimer); playing = false; beatIndex = 0; schedulerTimer = null;
         document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
         document.getElementById('play-btn').textContent = '▶ Start';
         document.getElementById('play-btn').classList.remove('playing');
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
     } else {
-        try {
-            await initAudio();
-        } catch (err) {
-            console.error('Unable to start audio playback.', err);
-            return;
-        }
-        if (!audioCtx || audioCtx.state !== 'running') return;
+        await initAudio();
         playing = true; beatIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.05;
         scheduler();
         document.getElementById('play-btn').textContent = '⏹ Stop';
         document.getElementById('play-btn').classList.add('playing');
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
     }
 }
+
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLock && document.visibilityState === 'visible' && playing) {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+    }
+});
 
 function setBpm(val) {
     bpm = Math.min(300, Math.max(30, Math.round(val)));
     document.getElementById('bpm-display').textContent = bpm;
-    const slider = document.getElementById('bpm-slider');
-    slider.value = bpm;
+    document.getElementById('bpm-slider').value = bpm;
     updateBpmName();
 }
 
@@ -443,9 +415,9 @@ function onSliderChange(val) { setBpm(parseInt(val)); markPresetDirty(); }
 
 function updateBpmName() {
     const names = [
-        [20, 39, 'Larghissimo'], [40, 59, 'Largo'], [60, 65, 'Larghetto'],
-        [66, 75, 'Adagio'], [76, 107, 'Andante'], [108, 119, 'Moderato'],
-        [120, 155, 'Allegro'], [156, 175, 'Vivace'], [176, 199, 'Presto'], [200, 300, 'Prestissimo']
+        [20,39,'Larghissimo'],[40,59,'Largo'],[60,65,'Larghetto'],[66,75,'Adagio'],
+        [76,107,'Andante'],[108,119,'Moderato'],[120,155,'Allegro'],
+        [156,175,'Vivace'],[176,199,'Presto'],[200,300,'Prestissimo']
     ];
     const n = names.find(([lo, hi]) => bpm >= lo && bpm <= hi);
     document.getElementById('bpm-name').textContent = n ? n[2] : '';
@@ -453,25 +425,24 @@ function updateBpmName() {
 
 function tapTempo() {
     const now = Date.now();
-    tapTimes = tapTimes.filter(t => now - t < 3000); 
+    tapTimes = tapTimes.filter(t => now - t < 3000);
     tapTimes.push(now);
     if (tapTimes.length >= 2) {
-        const intervals = []; 
-        for (let i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i - 1]);
-        const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-        setBpm(Math.round(60000 / avg));
+        const intervals = [];
+        for (let i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i-1]);
+        setBpm(Math.round(60000 / (intervals.reduce((a,b) => a+b,0) / intervals.length)));
     }
     const btn = document.getElementById('tap-btn');
     btn.textContent = tapTimes.length < 2 ? 'Keep tapping...' : 'Tapping... (' + tapTimes.length + ')';
-    setTimeout(() => { if (Date.now() - tapTimes[tapTimes.length - 1] > 2000) btn.textContent = 'Tap Tempo'; }, 2200);
+    setTimeout(() => { if (Date.now() - tapTimes[tapTimes.length-1] > 2000) btn.textContent = 'Tap Tempo'; }, 2200);
 }
 
-/**
- * TABS & PERSISTENCE
- */
+// ---- Tabs & collections ----
+
 function switchTab(tab) {
     document.getElementById('tab-play').classList.toggle('active', tab === 'play');
     document.getElementById('tab-presets').classList.toggle('active', tab === 'presets');
+    document.getElementById('tab-new').classList.remove('active');
     document.getElementById('page-play').classList.toggle('active', tab === 'play');
     document.getElementById('page-presets').classList.toggle('active', tab === 'presets');
     if (tab === 'presets') renderPresets();
@@ -486,43 +457,102 @@ function switchCollection(col) {
     renderPresets();
 }
 
-function getPersonalPresets() { 
-    try { return JSON.parse(localStorage.getItem('metro_presets') || '[]'); } 
-    catch { return []; } 
+function getPersonalPresets() {
+    try { return JSON.parse(localStorage.getItem('metro_presets') || '[]'); } catch { return []; }
 }
 function savePersonalPresets(arr) { localStorage.setItem('metro_presets', JSON.stringify(arr)); }
+
+// ---- Render presets ----
 
 function renderPresets() {
     const list = document.getElementById('preset-list');
     list.innerHTML = '';
-    
-    const collection = activePresetsCollection === 'party' ? JEDS_PARTY_PRESETS : getPersonalPresets();
-    
-    if (collection.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text2);">
-            <div style="font-size:40px; margin-bottom:10px;">Empty</div>
-            <p>Add presets to see them here.</p>
-        </div>`;
-        return;
-    }
 
-    collection.forEach((p, idx) => {
-        const card = document.createElement('div');
-        card.className = 'preset-card ' + (activePresetsCollection === 'party' ? 'party-card' : 'personal-card');
-        const ts = p.freeTime ? ' · Free' : (p.timeSig ? ` · ${p.timeSig}/4` : '');
-        card.innerHTML = `
-            <div class="preset-bpm">${p.bpm}</div>
-            <div class="preset-info">
-                <div class="preset-title">${escHtml(p.title)}</div>
-                <div class="preset-meta">BPM ${p.bpm}${ts}</div>
-            </div>
-            ${activePresetsCollection === 'personal' ? `<button class="preset-del" onclick="deletePreset(${idx},event)">×</button>` : ''}
-        `;
-        card.onclick = (e) => { 
-            if (e.target.classList.contains('preset-del')) return;
-            loadPreset(p, activePresetsCollection, idx); 
-        };
-        list.appendChild(card);
+    if (activePresetsCollection === 'party') {
+        if (!JEDS_PARTY_PRESETS || JEDS_PARTY_PRESETS.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:40px;margin-bottom:10px">🎉</div><p>No party songs found.</p></div>';
+            return;
+        }
+        JEDS_PARTY_PRESETS.forEach((p, idx) => {
+            const card = document.createElement('div');
+            card.className = 'preset-card party-card';
+            const ts = p.freeTime ? ' · Free' : (p.timeSig ? ` · ${p.timeSig}/4` : '');
+            const snd = p.sound ? ` · ${p.sound.charAt(0).toUpperCase() + p.sound.slice(1)}` : '';
+            card.innerHTML = `
+                <div class="preset-bpm">${p.bpm}</div>
+                <div class="preset-info">
+                    <div class="preset-title">${escHtml(p.title)}</div>
+                    <div class="preset-meta">BPM ${p.bpm}${ts}${snd}</div>
+                </div>`;
+            card.onclick = () => loadPreset(p, 'party', idx);
+            list.appendChild(card);
+        });
+    } else {
+        const presets = getPersonalPresets();
+        if (presets.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:40px;margin-bottom:10px">🎵</div><p>No personal presets yet.<br>Save a BPM from the Play tab.</p></div>';
+            return;
+        }
+        presets.forEach((p, idx) => {
+            const card = document.createElement('div');
+            card.className = 'preset-card personal-card';
+            card.dataset.idx = idx;
+            const ts = p.freeTime ? ' · Free' : (p.timeSig ? ` · ${p.timeSig}/4` : '');
+            const snd = p.sound ? ` · ${p.sound.charAt(0).toUpperCase() + p.sound.slice(1)}` : '';
+            card.innerHTML = `
+                <div class="preset-handle">⠿</div>
+                <div class="preset-bpm">${p.bpm}</div>
+                <div class="preset-info">
+                    <div class="preset-title">${escHtml(p.title)}</div>
+                    <div class="preset-meta">BPM ${p.bpm}${ts}${snd}</div>
+                </div>
+                <button class="preset-del" onclick="deletePreset(${idx}, event)">×</button>`;
+            card.onclick = e => {
+                if (e.target.classList.contains('preset-del') || e.target.classList.contains('preset-handle')) return;
+                loadPreset(p, 'personal', idx);
+            };
+            list.appendChild(card);
+        });
+        setupDrag();
+    }
+}
+
+function setupDrag() {
+    const list = document.getElementById('preset-list');
+    let drag = null, startIdx = 0;
+    list.querySelectorAll('.preset-handle').forEach(h => {
+        h.addEventListener('touchstart', e => {
+            e.stopPropagation();
+            drag = h.closest('.preset-card');
+            startIdx = parseInt(drag.dataset.idx);
+            drag.classList.add('dragging');
+        }, { passive: true });
+    });
+    list.addEventListener('touchmove', e => {
+        if (!drag) return;
+        e.preventDefault();
+        const y = e.touches[0].clientY;
+        const cards = [...list.querySelectorAll('.preset-card')];
+        cards.forEach(c => c.classList.remove('drag-over'));
+        const tgt = cards.find(c => { if (c === drag) return false; const r = c.getBoundingClientRect(); return y >= r.top && y <= r.bottom; });
+        if (tgt) tgt.classList.add('drag-over');
+    }, { passive: false });
+    list.addEventListener('touchend', () => {
+        if (!drag) return;
+        const cards = [...list.querySelectorAll('.preset-card')];
+        const tgt = cards.find(c => c.classList.contains('drag-over'));
+        if (tgt) {
+            const toIdx = parseInt(tgt.dataset.idx);
+            const p = getPersonalPresets();
+            const [m] = p.splice(startIdx, 1);
+            p.splice(toIdx, 0, m);
+            savePersonalPresets(p);
+            renderPresets();
+        } else {
+            drag.classList.remove('dragging');
+            cards.forEach(c => c.classList.remove('drag-over'));
+        }
+        drag = null;
     });
 }
 
@@ -545,20 +575,21 @@ function updateSongHeader() {
     const nameEl = document.getElementById('song-header-name');
     const badge = document.getElementById('song-collection-badge');
     const btn = document.getElementById('bottom-save-btn');
-    
+
     if (currentPresetIdx >= 0 && currentPresetName) {
         header.style.display = 'block';
         nameEl.textContent = currentPresetName;
         if (currentCollection === 'party') {
             badge.textContent = "Jeds Party"; badge.className = 'song-collection-badge party';
-            btn.textContent = '💾 Save to Personal';
+            btn.textContent = '💾 Save to Personal'; btn.style.borderColor = ''; btn.style.color = '';
         } else {
             badge.textContent = 'Personal'; badge.className = 'song-collection-badge personal';
             btn.textContent = '💾 Update "' + currentPresetName + '"';
+            btn.style.borderColor = 'var(--accent2)'; btn.style.color = 'var(--accent2)';
         }
     } else {
         header.style.display = 'none';
-        btn.textContent = '💾 Save to Personal';
+        btn.textContent = '💾 Save to Personal'; btn.style.borderColor = ''; btn.style.color = '';
     }
 }
 
@@ -566,13 +597,14 @@ function markPresetDirty() {
     if (currentPresetIdx >= 0 && currentCollection === 'personal') {
         const btn = document.getElementById('bottom-save-btn');
         btn.textContent = '💾 Update (modified)';
-        btn.style.borderColor = 'var(--accent2)';
+        btn.style.borderColor = 'var(--accent2)'; btn.style.color = 'var(--accent2)';
     }
 }
 
 function bottomSaveAction() {
     if (currentPresetIdx >= 0 && currentCollection === 'personal') {
         const presets = getPersonalPresets();
+        if (!presets[currentPresetIdx]) return;
         presets[currentPresetIdx] = { title: currentPresetName, bpm, timeSig, freeTime, sound: soundType };
         savePersonalPresets(presets);
         const btn = document.getElementById('bottom-save-btn');
@@ -596,6 +628,9 @@ function deletePreset(idx, e) {
     const presets = getPersonalPresets();
     presets.splice(idx, 1);
     savePersonalPresets(presets);
+    if (currentCollection === 'personal' && currentPresetIdx === idx) {
+        currentPresetName = ''; currentPresetIdx = -1; currentCollection = 'none'; updateSongHeader();
+    }
     renderPresets();
 }
 
@@ -603,11 +638,14 @@ function openSaveModal() {
     document.getElementById('preset-title-input').value = currentPresetName || '';
     document.getElementById('preset-bpm-input').value = bpm;
     document.getElementById('save-modal').classList.add('open');
+    setTimeout(() => document.getElementById('preset-title-input').focus(), 100);
 }
 
 function openAddModal() {
     document.getElementById('add-title-input').value = '';
+    document.getElementById('add-bpm-input').value = 120;
     document.getElementById('add-modal').classList.add('open');
+    setTimeout(() => document.getElementById('add-title-input').focus(), 100);
 }
 
 function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
@@ -633,32 +671,15 @@ function addPreset() {
     renderPresets();
 }
 
-function escHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function removeAudioUnlockListeners() {
-    AUDIO_UNLOCK_EVENTS.forEach(eventName => {
-        document.removeEventListener(eventName, unlockAudioFromGesture);
-    });
-}
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
 
-function unlockAudioFromGesture() {
-    removeAudioUnlockListeners();
-    if (audioUnlockPending || (audioCtx && audioCtx.state === 'running')) return;
-    audioUnlockPending = true;
-    initAudio()
-        .catch(err => console.error('Unable to unlock audio.', err))
-        .finally(() => { audioUnlockPending = false; });
-}
-
-/**
- * INIT
- */
-AUDIO_UNLOCK_EVENTS.forEach(eventName => {
-    document.addEventListener(eventName, unlockAudioFromGesture, { passive: true });
-});
 buildChips();
 buildBeatDots();
-updateBpmName();
+setBpm(120);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
