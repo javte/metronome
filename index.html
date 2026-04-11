@@ -638,11 +638,8 @@ function removeAudioUnlockListeners() {
 }
 
 function unlockAudioFromGesture() {
-    if (audioUnlockPending || (audioCtx && audioCtx.state === 'running')) {
-        removeAudioUnlockListeners();
-        return;
-    }
     removeAudioUnlockListeners();
+    if (audioUnlockPending || (audioCtx && audioCtx.state === 'running')) return;
     audioUnlockPending = true;
     initAudio()
         .catch(err => console.error('Unable to unlock audio.', err))
@@ -653,8 +650,7 @@ function unlockAudioFromGesture() {
  * INIT
  */
 AUDIO_UNLOCK_EVENTS.forEach(eventName => {
-    const options = eventName === 'keydown' ? { once: true } : { once: true, passive: true };
-    document.addEventListener(eventName, unlockAudioFromGesture, options);
+    document.addEventListener(eventName, unlockAudioFromGesture, { once: true, passive: true });
 });
 buildChips();
 buildBeatDots();
