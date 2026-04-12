@@ -268,6 +268,21 @@ let activePresetsCollection = 'party';
 const timeSigs = [1,2,3,4,5,6,7,8];
 const sounds = ['click','beep','wood'];
 
+// Pre-computed audio buffers (filled once AudioContext exists)
+let clickBuf = null, clickAccentBuf = null;
+let woodBuf = null, woodAccentBuf = null;
+
+// Web Worker for scheduling timer — runs off main thread so iOS Safari
+// timer throttling on the main thread cannot cause missed beats.
+let schedulerWorker = null;
+function createSchedulerWorker() {
+    const code = `let tid = null; onmessage = e => { if (e.data === 'start') { tid = setInterval(() => postMessage('tick'), 25); } else if (e.data === 'stop') { clearInterval(tid); tid = null; } };`;
+    const blob = new Blob([code], { type: 'application/javascript' });
+    const w = new Worker(URL.createObjectURL(blob));
+    w.onmessage = () => scheduler();
+    return w;
+}
+
 // ---- Audio ----
 
 // iOS Audio Strategy:
@@ -341,16 +356,45 @@ function stopKeepAlive() {
     keepAliveNode = null;
 }
 
+// Pre-compute reusable buffers so we never allocate during playback.
+// This eliminates GC pauses that cause timing jitter on mobile.
+function buildBuffers() {
+    const ctx = audioCtx;
+    const sr = ctx.sampleRate;
+
+    // Click — white noise burst, bandpass-filtered later at play time
+    // Use a seeded-style deterministic noise so it sounds consistent
+    clickBuf = ctx.createBuffer(1, sr * 0.04, sr);
+    const cd = clickBuf.getChannelData(0);
+    // Use a simple LCG for deterministic noise (avoids Math.random jitter)
+    let seed = 12345;
+    for (let i = 0; i < cd.length; i++) {
+        seed = (seed * 16807 + 0) % 2147483647;
+        cd[i] = ((seed / 2147483647) * 2 - 1) * Math.exp(-i / (sr * 0.006));
+    }
+    clickAccentBuf = clickBuf; // same buffer, different gain/filter at play time
+
+    // Wood — sharp transient + tonal body.
+    // Original had Math.sin(i*0.35) which starts at 0 (soft onset).
+    // Fix: start with a hard impulse spike, then the tonal decay.
+    woodBuf = ctx.createBuffer(1, sr * 0.05, sr);
+    const wd = woodBuf.getChannelData(0);
+    for (let i = 0; i < wd.length; i++) {
+        // Sharp transient in first ~0.5ms, then tonal body
+        const transient = i < sr * 0.0005 ? 1.0 : 0;
+        const tone = Math.sin(i * 0.35) * Math.exp(-i / (sr * 0.012));
+        wd[i] = transient * Math.exp(-i / (sr * 0.0003)) + tone;
+    }
+    woodAccentBuf = woodBuf; // same buffer, different gain at play time
+}
+
 function playClick(time, isAccent) {
     const ctx = audioCtx;
     const gain = ctx.createGain();
     gain.connect(ctx.destination);
 
     if (soundType === 'click') {
-        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.006));
-        const src = ctx.createBufferSource(); src.buffer = buf;
+        const src = ctx.createBufferSource(); src.buffer = clickBuf;
         const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = isAccent ? 1800 : 1000; filter.Q.value = 2;
         src.connect(filter); filter.connect(gain);
         gain.gain.setValueAtTime(isAccent ? 1.0 : 0.65, time);
@@ -362,16 +406,14 @@ function playClick(time, isAccent) {
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
         osc.start(time); osc.stop(time + 0.07);
     } else if (soundType === 'wood') {
-        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = Math.sin(i * 0.35) * Math.exp(-i / (ctx.sampleRate * 0.012));
-        const src = ctx.createBufferSource(); src.buffer = buf; src.connect(gain);
+        const src = ctx.createBufferSource(); src.buffer = woodBuf; src.connect(gain);
         gain.gain.setValueAtTime(isAccent ? 0.9 : 0.55, time); src.start(time);
     }
 }
 
 function scheduler() {
-    // 300ms look-ahead: iOS may throttle setTimeout, so schedule further ahead
+    // 300ms look-ahead: even if the timer is delayed, audio is scheduled
+    // precisely on the audio clock via src.start(time).
     while (nextNoteTime < audioCtx.currentTime + 0.3) {
         const isAccent = !freeTime && beatIndex === 0;
         playClick(nextNoteTime, isAccent);
@@ -379,7 +421,8 @@ function scheduler() {
         nextNoteTime += 60.0 / bpm;
         beatIndex = freeTime ? 0 : (beatIndex + 1) % timeSig;
     }
-    schedulerTimer = setTimeout(scheduler, 25);
+    // If no worker available, fall back to main-thread setTimeout
+    if (!schedulerWorker) schedulerTimer = setTimeout(scheduler, 25);
 }
 
 function scheduleBeatFlash(delay, index) {
@@ -447,8 +490,7 @@ function buildChips() {
 // ---- Core logic ----
 
 async function togglePlay() {
-    if (playing) {
-        clearTimeout(schedulerTimer); playing = false; beatIndex = 0; schedulerTimer = null;
+    if (playing) {        if (schedulerWorker) schedulerWorker.postMessage('stop');        clearTimeout(schedulerTimer); playing = false; beatIndex = 0; schedulerTimer = null;
         document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
         document.getElementById('play-btn').textContent = '▶ Start';
         document.getElementById('play-btn').classList.remove('playing');
@@ -476,10 +518,24 @@ async function togglePlay() {
             return;
         }
 
+        // Pre-compute buffers on first play (needs a running AudioContext)
+        if (!clickBuf) buildBuffers();
+
         playing = true; beatIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.05;
         startKeepAlive();
-        scheduler();
+
+        // Use Web Worker timer if available — immune to main-thread throttling
+        if (!schedulerWorker) {
+            try { schedulerWorker = createSchedulerWorker(); } catch (e) { /* fall back to setTimeout */ }
+        }
+        if (schedulerWorker) {
+            scheduler(); // run once immediately
+            schedulerWorker.postMessage('start');
+        } else {
+            scheduler();
+        }
+
         document.getElementById('play-btn').textContent = '⏹ Stop';
         document.getElementById('play-btn').classList.add('playing');
         // Request wake lock asynchronously (non-blocking)

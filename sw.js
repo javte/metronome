@@ -1,4 +1,4 @@
-const CACHE = 'jeds-metro-v6';
+const CACHE = 'jeds-metro-v7';
 const FILES = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
